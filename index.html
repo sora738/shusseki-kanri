@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>出席管理</title>
+<meta name="description" content="週間時間割の閲覧と科目別の出席記録、欠席可能数の自動計算ができる出席管理アプリ">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="出席管理">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2F4858">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F6F3EC; --surface:#FFFFFF; --surface-2:#EFEAE0; --line:#DDD6C8;
+  --ink:#2A2723; --ink-soft:#726B5E;
+  --accent:#2F4858; --accent-ink:#FFFFFF; --accent-soft:#DCE6E9;
+  --cell-normal-bg:#BEE3ED; --cell-normal-ink:#0F3A44;
+  --cell-exam-bg:#DED1EF; --cell-exam-ink:#402C5C;
+  --cell-empty-bg:#EEEAE0; --cell-empty-line:#E1DACB;
+  --warn-orange-bg:#F2A94D; --warn-orange-ink:#432A00;
+  --warn-red-bg:#E2645A; --warn-red-ink:#3B0A06;
+  --mark-present-bg:#2F8F5B; --mark-absent-bg:#C1443B; --mark-none-bg:#B9B0A0;
+  --today:#D8622A; --shadow:0 1px 2px rgba(42,39,35,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#181611; --surface:#221E18; --surface-2:#2A251D; --line:#3A342A;
+    --ink:#ECE6D9; --ink-soft:#B2A997;
+    --accent:#8FB6C4; --accent-ink:#10222A; --accent-soft:#233238;
+    --cell-normal-bg:#234E5B; --cell-normal-ink:#CDEBF3;
+    --cell-exam-bg:#493768; --cell-exam-ink:#EFE3FB;
+    --cell-empty-bg:#241F18; --cell-empty-line:#332C21;
+    --warn-orange-bg:#8A5A1E; --warn-orange-ink:#FFE6C0;
+    --warn-red-bg:#7C2B25; --warn-red-ink:#FFD9D4;
+    --mark-present-bg:#4FAE79; --mark-absent-bg:#D97970; --mark-none-bg:#665F51;
+    --today:#F0925A; --shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#181611; --surface:#221E18; --surface-2:#2A251D; --line:#3A342A;
+  --ink:#ECE6D9; --ink-soft:#B2A997;
+  --accent:#8FB6C4; --accent-ink:#10222A; --accent-soft:#233238;
+  --cell-normal-bg:#234E5B; --cell-normal-ink:#CDEBF3;
+  --cell-exam-bg:#493768; --cell-exam-ink:#EFE3FB;
+  --cell-empty-bg:#241F18; --cell-empty-line:#332C21;
+  --warn-orange-bg:#8A5A1E; --warn-orange-ink:#FFE6C0;
+  --warn-red-bg:#7C2B25; --warn-red-ink:#FFD9D4;
+  --mark-present-bg:#4FAE79; --mark-absent-bg:#D97970; --mark-none-bg:#665F51;
+  --today:#F0925A; --shadow:0 1px 3px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box;}
+html,body{height:100%;margin:0;}
+body{background:var(--bg);overscroll-behavior:none;}
+.app{height:100%;display:flex;flex-direction:column;font-family:"Noto Sans JP",sans-serif;color:var(--ink);background:var(--bg);overflow:hidden;}
+
+.hd{flex:0 0 auto;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:calc(14px + env(safe-area-inset-top,0px)) 16px 8px;border-bottom:1px solid var(--line);background:var(--surface);}
+.hd h1{margin:0;font-family:"Shippori Mincho",serif;font-weight:800;font-size:20px;letter-spacing:.04em;color:var(--ink);}
+.hd .sub{margin:2px 0 0;font-size:10.5px;color:var(--ink-soft);}
+.hd .rule{max-width:190px;text-align:right;font-size:9.5px;line-height:1.5;color:var(--ink-soft);}
+
+.weeknav{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--line);}
+.weeknav button{appearance:none;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:7px 10px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;}
+.weeknav button:active{transform:scale(.96);}
+.weeknav button:disabled{opacity:.35;cursor:default;}
+.weeknav button:disabled:active{transform:none;}
+.weeknav .label{font-size:13px;font-weight:700;text-align:center;flex:1;font-variant-numeric:tabular-nums;}
+.weeknav .label small{display:block;font-size:9.5px;font-weight:500;color:var(--ink-soft);margin-top:1px;}
+
+.content{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+
+/* ---- timetable grid ---- */
+.grid{display:grid;grid-template-columns:30px repeat(5,minmax(84px,1fr));min-width:480px;}
+.gcell{border-right:1px solid var(--line);border-bottom:1px solid var(--line);}
+.g-corner{position:sticky;top:0;z-index:2;background:var(--surface);}
+.g-daycol{position:sticky;top:0;z-index:1;background:var(--surface);text-align:center;padding:7px 2px 6px;}
+.g-daycol .dow{font-size:12px;font-weight:700;}
+.g-daycol .dnum{font-size:10.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;}
+.g-daycol.today{color:var(--today);}
+.g-daycol.today .badge{display:inline-block;margin-top:2px;font-size:8.5px;background:var(--today);color:#fff;border-radius:6px;padding:1px 5px;font-weight:700;}
+.g-period{display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink-soft);font-weight:700;background:var(--surface);writing-mode:vertical-rl;}
+.g-slot{padding:3px;min-height:64px;display:flex;flex-direction:column;gap:3px;background:var(--cell-empty-bg);}
+.g-slot.today-col{box-shadow:inset 0 0 0 1.5px var(--today);}
+
+.blk{border:none;width:100%;text-align:left;border-radius:6px;padding:4px 5px 5px;font-family:inherit;cursor:pointer;background:var(--cell-normal-bg);color:var(--cell-normal-ink);box-shadow:var(--shadow);position:relative;}
+.blk.cat-EXAM{background:var(--cell-exam-bg);color:var(--cell-exam-ink);cursor:default;}
+.blk.warn-orange{background:var(--warn-orange-bg)!important;color:var(--warn-orange-ink)!important;}
+.blk.warn-red{background:var(--warn-red-bg)!important;color:var(--warn-red-ink)!important;}
+.blk:active{transform:scale(.97);}
+.blk .subj{font-size:10.5px;font-weight:900;line-height:1.2;}
+.blk .room{font-size:9px;opacity:.85;margin-top:1px;}
+.blk .lbl{font-size:9px;font-weight:700;margin-top:1px;}
+.blk .mark{position:absolute;top:3px;right:4px;width:16px;height:16px;border-radius:50%;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;color:#fff;background:var(--mark-none-bg);}
+.blk .mark.present{background:var(--mark-present-bg);}
+.blk .mark.absent{background:var(--mark-absent-bg);}
+
+/* ---- attendance list ---- */
+.sublist{padding:10px 12px 20px;display:flex;flex-direction:column;gap:8px;}
+.subcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;}
+.subcard>.row{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 13px;border:none;background:none;font-family:inherit;text-align:left;cursor:pointer;color:var(--ink);}
+.subcard>.row:active{background:var(--surface-2);}
+.subcard .name{font-size:14.5px;font-weight:700;}
+.subcard .name .cnt{font-size:10.5px;font-weight:500;color:var(--ink-soft);margin-left:6px;}
+.pill{font-size:10.5px;font-weight:800;border-radius:20px;padding:3px 9px;white-space:nowrap;}
+.pill.normal{background:var(--accent-soft);color:var(--accent);}
+.pill.orange{background:var(--warn-orange-bg);color:var(--warn-orange-ink);}
+.pill.red{background:var(--warn-red-bg);color:var(--warn-red-ink);}
+.chev{font-size:11px;color:var(--ink-soft);transition:transform .15s;}
+.subcard.open .chev{transform:rotate(90deg);}
+.detail{display:none;border-top:1px solid var(--line);padding:6px 10px 12px;}
+.subcard.open .detail{display:block;}
+.sess{display:flex;align-items:center;gap:8px;padding:7px 3px;border-bottom:1px dashed var(--line);}
+.sess:last-of-type{border-bottom:none;}
+.sess .d{width:78px;font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--ink-soft);flex:0 0 auto;}
+.sess .r{flex:1 1 auto;font-size:11.5px;color:var(--ink-soft);}
+.sess .r b{color:var(--ink);font-weight:700;}
+.sess button.mk{flex:0 0 auto;width:28px;height:28px;border-radius:50%;border:none;font-size:13px;font-weight:900;color:#fff;background:var(--mark-none-bg);cursor:pointer;}
+.sess button.mk.present{background:var(--mark-present-bg);}
+.sess button.mk.absent{background:var(--mark-absent-bg);}
+.sess.exam .r{opacity:.6;}
+.stats{margin-top:8px;padding:10px 11px;background:var(--surface-2);border-radius:9px;font-size:11.5px;display:flex;flex-wrap:wrap;column-gap:14px;row-gap:6px;}
+.stats .it b{display:block;font-size:14px;font-variant-numeric:tabular-nums;}
+.stats .it{color:var(--ink-soft);}
+.stats .it b{color:var(--ink);}
+.stats .it b.red{color:var(--warn-red-bg);}
+.stats .it b.orange{color:var(--warn-orange-bg);}
+.stats .gap{flex-basis:100%;height:0;}
+
+.tabbar{flex:0 0 auto;display:flex;border-top:1px solid var(--line);background:var(--surface);padding-bottom:env(safe-area-inset-bottom,0px);}
+.tabbar button{flex:1;padding:10px 4px 9px;border:none;background:none;font-family:inherit;color:var(--ink-soft);font-size:11px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.tabbar button .ic{font-size:17px;}
+.tabbar button.active{color:var(--accent);}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="hd">
+    <div>
+      <h1>出席管理</h1>
+      <p class="sub" id="hdSub"></p>
+    </div>
+    <p class="rule">出席には各科目の総授業回数(試験を除く)の2/3以上の出席が必要です。欠席可能数＝コマ数÷3切り捨て<br>残り欠席可能数が<span style="color:var(--warn-orange-bg);font-weight:700;">2回でオレンジ</span>、<span style="color:var(--warn-red-bg);font-weight:700;">1回以下で赤</span>になります</p>
+  </div>
+
+  <div class="weeknav" id="weeknav">
+    <button id="prevWk">← 前の週</button>
+    <div class="label" id="wkLabel"></div>
+    <button id="nextWk">次の週 →</button>
+  </div>
+
+  <div class="content" id="content"></div>
+
+  <div class="tabbar">
+    <button id="tabTime" class="active"><span class="ic">🗓️</span>時間割</button>
+    <button id="tabAtt"><span class="ic">📋</span>出席状況</button>
+  </div>
+</div>
+
+<script>
+const SCHEDULE = [{"id":"2026-09-14-p1","subject":"視覚系","date":"2026-09-14","day":"月","period":1,"room":"3講","category":"NORMAL"},{"id":"2026-09-14-p2","subject":"視覚系","date":"2026-09-14","day":"月","period":2,"room":"3講","category":"NORMAL"},{"id":"2026-09-14-p3","subject":"視覚系","date":"2026-09-14","day":"月","period":3,"room":"3講","category":"NORMAL"},{"id":"2026-09-14-p4","subject":"医と社","date":"2026-09-14","day":"月","period":4,"room":"3講","category":"NORMAL"},{"id":"2026-09-14-p5","subject":"放射線","date":"2026-09-14","day":"月","period":5,"room":"3講","category":"NORMAL"},{"id":"2026-09-14-p6","subject":"放射線","date":"2026-09-14","day":"月","period":6,"room":"3講","category":"NORMAL"},{"id":"2026-09-15-p1","subject":"視覚系","date":"2026-09-15","day":"火","period":1,"room":"3講","category":"NORMAL"},{"id":"2026-09-15-p2","subject":"視覚系","date":"2026-09-15","day":"火","period":2,"room":"3講","category":"NORMAL"},{"id":"2026-09-15-p3","subject":"視覚系","date":"2026-09-15","day":"火","period":3,"room":"3講","category":"NORMAL"},{"id":"2026-09-15-p4","subject":"耳鼻咽","date":"2026-09-15","day":"火","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-09-15-p5","subject":"耳鼻咽","date":"2026-09-15","day":"火","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-09-15-p6","subject":"耳鼻咽","date":"2026-09-15","day":"火","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-09-16-p1","subject":"放射線","date":"2026-09-16","day":"水","period":1,"room":"3講","category":"NORMAL"},{"id":"2026-09-16-p2","subject":"放射線","date":"2026-09-16","day":"水","period":2,"room":"3講","category":"NORMAL"},{"id":"2026-09-16-p3","subject":"放射線","date":"2026-09-16","day":"水","period":3,"room":"3講","category":"NORMAL"},{"id":"2026-09-16-p4","subject":"耳鼻咽","date":"2026-09-16","day":"水","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-09-16-p5","subject":"耳鼻咽","date":"2026-09-16","day":"水","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-09-16-p6","subject":"耳鼻咽","date":"2026-09-16","day":"水","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-09-16-p7","subject":"医英語","date":"2026-09-16","day":"水","period":7,"room":"4講","category":"NORMAL"},{"id":"2026-09-17-p4","subject":"耳鼻咽","date":"2026-09-17","day":"木","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-09-17-p5","subject":"耳鼻咽","date":"2026-09-17","day":"木","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-09-17-p6","subject":"耳鼻咽","date":"2026-09-17","day":"木","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-09-18-p1","subject":"視覚系","date":"2026-09-18","day":"金","period":1,"room":"3講","category":"NORMAL"},{"id":"2026-09-18-p2","subject":"視覚系","date":"2026-09-18","day":"金","period":2,"room":"3講","category":"NORMAL"},{"id":"2026-09-18-p3","subject":"視覚系","date":"2026-09-18","day":"金","period":3,"room":"3講","category":"NORMAL"},{"id":"2026-09-18-p4","subject":"耳鼻咽","date":"2026-09-18","day":"金","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-09-18-p5","subject":"耳鼻咽","date":"2026-09-18","day":"金","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-09-18-p6","subject":"耳鼻咽","date":"2026-09-18","day":"金","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-09-24-p4","subject":"放射線","date":"2026-09-24","day":"木","period":4,"room":"4講","category":"EXAM"},{"id":"2026-09-24-p5","subject":"放射線","date":"2026-09-24","day":"木","period":5,"room":"4講","category":"EXAM"},{"id":"2026-09-24-p6","subject":"放射線","date":"2026-09-24","day":"木","period":6,"room":"4講","category":"EXAM"},{"id":"2026-09-25-p1","subject":"視覚系","date":"2026-09-25","day":"金","period":1,"room":"3講","category":"NORMAL"},{"id":"2026-09-25-p2","subject":"視覚系","date":"2026-09-25","day":"金","period":2,"room":"3講","category":"NORMAL"},{"id":"2026-09-25-p3","subject":"視覚系","date":"2026-09-25","day":"金","period":3,"room":"3講","category":"NORMAL"},{"id":"2026-09-25-p4","subject":"耳鼻咽","date":"2026-09-25","day":"金","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-09-25-p5","subject":"耳鼻咽","date":"2026-09-25","day":"金","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-09-25-p6","subject":"耳鼻咽","date":"2026-09-25","day":"金","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-09-28-p1","subject":"視覚系","date":"2026-09-28","day":"月","period":1,"room":"3講","category":"NORMAL"},{"id":"2026-09-28-p2","subject":"視覚系","date":"2026-09-28","day":"月","period":2,"room":"3講","category":"NORMAL"},{"id":"2026-09-28-p3","subject":"視覚系","date":"2026-09-28","day":"月","period":3,"room":"3講","category":"NORMAL"},{"id":"2026-09-28-p4","subject":"耳鼻咽","date":"2026-09-28","day":"月","period":4,"room":"3講","category":"NORMAL"},{"id":"2026-09-28-p5","subject":"耳鼻咽","date":"2026-09-28","day":"月","period":5,"room":"3講","category":"NORMAL"},{"id":"2026-09-28-p6","subject":"耳鼻咽","date":"2026-09-28","day":"月","period":6,"room":"3講","category":"NORMAL"},{"id":"2026-09-29-p1","subject":"耳鼻咽","date":"2026-09-29","day":"火","period":1,"room":"3講","category":"NORMAL"},{"id":"2026-09-29-p2","subject":"耳鼻咽","date":"2026-09-29","day":"火","period":2,"room":"3講","category":"NORMAL"},{"id":"2026-09-29-p3","subject":"耳鼻咽","date":"2026-09-29","day":"火","period":3,"room":"3講","category":"NORMAL"},{"id":"2026-09-29-p4","subject":"医と社","date":"2026-09-29","day":"火","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-09-29-p5","subject":"免疫系","date":"2026-09-29","day":"火","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-09-29-p6","subject":"免疫系","date":"2026-09-29","day":"火","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-09-30-p1","subject":"視覚系","date":"2026-09-30","day":"水","period":1,"room":"3講","category":"NORMAL"},{"id":"2026-09-30-p2","subject":"視覚系","date":"2026-09-30","day":"水","period":2,"room":"3講","category":"NORMAL"},{"id":"2026-09-30-p3","subject":"視覚系","date":"2026-09-30","day":"水","period":3,"room":"3講","category":"NORMAL"},{"id":"2026-09-30-p4","subject":"耳鼻咽","date":"2026-09-30","day":"水","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-09-30-p5","subject":"耳鼻咽","date":"2026-09-30","day":"水","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-09-30-p6","subject":"耳鼻咽","date":"2026-09-30","day":"水","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-09-30-p7","subject":"医英語","date":"2026-09-30","day":"水","period":7,"room":"4講","category":"NORMAL"},{"id":"2026-10-01-p1","subject":"耳鼻咽","date":"2026-10-01","day":"木","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-10-01-p2","subject":"耳鼻咽","date":"2026-10-01","day":"木","period":2,"room":"4講","category":"TBL"},{"id":"2026-10-01-p3","subject":"耳鼻咽","date":"2026-10-01","day":"木","period":3,"room":"4講","category":"TBL"},{"id":"2026-10-01-p4","subject":"視覚系","date":"2026-10-01","day":"木","period":4,"room":"1講","category":"NORMAL"},{"id":"2026-10-01-p5","subject":"視覚系","date":"2026-10-01","day":"木","period":5,"room":"1講","category":"NORMAL"},{"id":"2026-10-01-p6","subject":"視覚系","date":"2026-10-01","day":"木","period":6,"room":"1講","category":"NORMAL"},{"id":"2026-10-02-p4","subject":"耳鼻咽","date":"2026-10-02","day":"金","period":4,"room":"2講","category":"EXAM"},{"id":"2026-10-02-p5","subject":"耳鼻咽","date":"2026-10-02","day":"金","period":5,"room":"2講","category":"EXAM"},{"id":"2026-10-02-p6","subject":"耳鼻咽","date":"2026-10-02","day":"金","period":6,"room":"2講","category":"EXAM"},{"id":"2026-10-05-p1","subject":"視覚系","date":"2026-10-05","day":"月","period":1,"room":"4講","category":"TBL"},{"id":"2026-10-05-p2","subject":"視覚系","date":"2026-10-05","day":"月","period":2,"room":"4講","category":"TBL"},{"id":"2026-10-05-p3","subject":"視覚系","date":"2026-10-05","day":"月","period":3,"room":"4講","category":"TBL"},{"id":"2026-10-05-p4","subject":"免疫系","date":"2026-10-05","day":"月","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-10-05-p5","subject":"免疫系","date":"2026-10-05","day":"月","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-10-05-p6","subject":"免疫系","date":"2026-10-05","day":"月","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-10-06-p4","subject":"視覚系","date":"2026-10-06","day":"火","period":4,"room":"4講","category":"EXAM"},{"id":"2026-10-06-p5","subject":"視覚系","date":"2026-10-06","day":"火","period":5,"room":"4講","category":"EXAM"},{"id":"2026-10-06-p6","subject":"視覚系","date":"2026-10-06","day":"火","period":6,"room":"4講","category":"EXAM"},{"id":"2026-10-07-p1","subject":"皮膚系","date":"2026-10-07","day":"水","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-10-07-p2","subject":"皮膚系","date":"2026-10-07","day":"水","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-10-07-p3","subject":"皮膚系","date":"2026-10-07","day":"水","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-10-07-p4","subject":"免疫系","date":"2026-10-07","day":"水","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-10-07-p5","subject":"免疫系","date":"2026-10-07","day":"水","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-10-07-p6","subject":"免疫系","date":"2026-10-07","day":"水","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-10-07-p7","subject":"医英語","date":"2026-10-07","day":"水","period":7,"room":"4講","category":"NORMAL"},{"id":"2026-10-08-p1","subject":"皮膚系","date":"2026-10-08","day":"木","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-10-08-p2","subject":"皮膚系","date":"2026-10-08","day":"木","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-10-08-p3","subject":"皮膚系","date":"2026-10-08","day":"木","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-10-08-p4","subject":"免疫系","date":"2026-10-08","day":"木","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-10-08-p5","subject":"免疫系","date":"2026-10-08","day":"木","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-10-08-p6","subject":"免疫系","date":"2026-10-08","day":"木","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-10-09-p1","subject":"皮膚系","date":"2026-10-09","day":"金","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-10-09-p2","subject":"皮膚系","date":"2026-10-09","day":"金","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-10-09-p3","subject":"皮膚系","date":"2026-10-09","day":"金","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-10-09-p4","subject":"医と社","date":"2026-10-09","day":"金","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-10-09-p5","subject":"医と社","date":"2026-10-09","day":"金","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-10-09-p6","subject":"医と社","date":"2026-10-09","day":"金","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-10-13-p1","subject":"免疫系","date":"2026-10-13","day":"火","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-10-13-p2","subject":"免疫系","date":"2026-10-13","day":"火","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-10-13-p3","subject":"免疫系","date":"2026-10-13","day":"火","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-10-13-p4","subject":"医と社","date":"2026-10-13","day":"火","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-10-13-p5","subject":"皮膚系","date":"2026-10-13","day":"火","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-10-13-p6","subject":"皮膚系","date":"2026-10-13","day":"火","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-10-14-p1","subject":"皮膚系","date":"2026-10-14","day":"水","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-10-14-p2","subject":"皮膚系","date":"2026-10-14","day":"水","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-10-14-p3","subject":"皮膚系","date":"2026-10-14","day":"水","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-10-14-p4","subject":"免疫系","date":"2026-10-14","day":"水","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-10-14-p5","subject":"免疫系","date":"2026-10-14","day":"水","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-10-14-p6","subject":"免疫系","date":"2026-10-14","day":"水","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-10-14-p7","subject":"医英語","date":"2026-10-14","day":"水","period":7,"room":"4講","category":"NORMAL"},{"id":"2026-10-15-p1","subject":"皮膚系","date":"2026-10-15","day":"木","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-10-15-p2","subject":"皮膚系","date":"2026-10-15","day":"木","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-10-15-p3","subject":"皮膚系","date":"2026-10-15","day":"木","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-10-15-p4","subject":"免疫系","date":"2026-10-15","day":"木","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-10-15-p5","subject":"免疫系","date":"2026-10-15","day":"木","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-10-15-p6","subject":"免疫系","date":"2026-10-15","day":"木","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-10-16-p1","subject":"皮膚系","date":"2026-10-16","day":"金","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-10-16-p2","subject":"皮膚系","date":"2026-10-16","day":"金","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-10-16-p3","subject":"皮膚系","date":"2026-10-16","day":"金","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-10-16-p4","subject":"免疫系","date":"2026-10-16","day":"金","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-10-16-p5","subject":"免疫系","date":"2026-10-16","day":"金","period":5,"room":"4講","category":"TBL"},{"id":"2026-10-16-p6","subject":"免疫系","date":"2026-10-16","day":"金","period":6,"room":"4講","category":"TBL"},{"id":"2026-10-19-p1","subject":"皮膚系","date":"2026-10-19","day":"月","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-10-19-p2","subject":"皮膚系","date":"2026-10-19","day":"月","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-10-19-p3","subject":"皮膚系","date":"2026-10-19","day":"月","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-10-20-p4","subject":"免疫系","date":"2026-10-20","day":"火","period":4,"room":"4講","category":"EXAM"},{"id":"2026-10-20-p5","subject":"免疫系","date":"2026-10-20","day":"火","period":5,"room":"4講","category":"EXAM"},{"id":"2026-10-20-p6","subject":"免疫系","date":"2026-10-20","day":"火","period":6,"room":"4講","category":"EXAM"},{"id":"2026-10-21-p1","subject":"皮膚系","date":"2026-10-21","day":"水","period":1,"room":"4講","category":"TBL"},{"id":"2026-10-21-p2","subject":"皮膚系","date":"2026-10-21","day":"水","period":2,"room":"4講","category":"TBL"},{"id":"2026-10-21-p7","subject":"医英語","date":"2026-10-21","day":"水","period":7,"room":"4講","category":"NORMAL"},{"id":"2026-10-22-p4","subject":"皮膚系","date":"2026-10-22","day":"木","period":4,"room":"4講","category":"EXAM"},{"id":"2026-10-22-p5","subject":"皮膚系","date":"2026-10-22","day":"木","period":5,"room":"4講","category":"EXAM"},{"id":"2026-10-22-p6","subject":"皮膚系","date":"2026-10-22","day":"木","period":6,"room":"4講","category":"EXAM"},{"id":"2026-10-23-p1","subject":"医と社","date":"2026-10-23","day":"金","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-10-23-p2","subject":"医と社","date":"2026-10-23","day":"金","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-10-23-p3","subject":"医と社","date":"2026-10-23","day":"金","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-10-23-p4","subject":"医と社","date":"2026-10-23","day":"金","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-10-23-p5","subject":"医と社","date":"2026-10-23","day":"金","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-10-23-p6","subject":"医と社","date":"2026-10-23","day":"金","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-10-26-p1","subject":"脳神経","date":"2026-10-26","day":"月","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-10-26-p2","subject":"脳神経","date":"2026-10-26","day":"月","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-10-26-p3","subject":"脳神経","date":"2026-10-26","day":"月","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-10-26-p4","subject":"脳神経","date":"2026-10-26","day":"月","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-10-26-p5","subject":"精神系","date":"2026-10-26","day":"月","period":5,"room":"3講","category":"NORMAL"},{"id":"2026-10-26-p6","subject":"精神系","date":"2026-10-26","day":"月","period":6,"room":"3講","category":"NORMAL"},{"id":"2026-10-27-p1","subject":"脳神経","date":"2026-10-27","day":"火","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-10-27-p2","subject":"脳神経","date":"2026-10-27","day":"火","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-10-27-p3","subject":"脳神経","date":"2026-10-27","day":"火","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-10-27-p4","subject":"精神系","date":"2026-10-27","day":"火","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-10-27-p5","subject":"精神系","date":"2026-10-27","day":"火","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-10-27-p6","subject":"精神系","date":"2026-10-27","day":"火","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-10-28-p1","subject":"脳神経","date":"2026-10-28","day":"水","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-10-28-p2","subject":"脳神経","date":"2026-10-28","day":"水","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-10-28-p3","subject":"脳神経","date":"2026-10-28","day":"水","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-10-28-p4","subject":"脳神経","date":"2026-10-28","day":"水","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-10-28-p5","subject":"脳神経","date":"2026-10-28","day":"水","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-10-28-p6","subject":"脳神経","date":"2026-10-28","day":"水","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-10-28-p7","subject":"医英語","date":"2026-10-28","day":"水","period":7,"room":"4講","category":"NORMAL"},{"id":"2026-10-29-p1","subject":"精神系","date":"2026-10-29","day":"木","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-10-29-p2","subject":"精神系","date":"2026-10-29","day":"木","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-10-29-p3","subject":"精神系","date":"2026-10-29","day":"木","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-10-29-p4","subject":"脳神経","date":"2026-10-29","day":"木","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-10-29-p5","subject":"脳神経","date":"2026-10-29","day":"木","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-10-29-p6","subject":"脳神経","date":"2026-10-29","day":"木","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-10-30-p1","subject":"精神系","date":"2026-10-30","day":"金","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-10-30-p2","subject":"精神系","date":"2026-10-30","day":"金","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-10-30-p3","subject":"精神系","date":"2026-10-30","day":"金","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-10-30-p4","subject":"医と社","date":"2026-10-30","day":"金","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-10-30-p5","subject":"医と社","date":"2026-10-30","day":"金","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-10-30-p6","subject":"医と社","date":"2026-10-30","day":"金","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-11-02-p1","subject":"精神系","date":"2026-11-02","day":"月","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-11-02-p2","subject":"精神系","date":"2026-11-02","day":"月","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-11-02-p3","subject":"精神系","date":"2026-11-02","day":"月","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-11-02-p4","subject":"脳神経","date":"2026-11-02","day":"月","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-11-02-p5","subject":"脳神経","date":"2026-11-02","day":"月","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-11-02-p6","subject":"脳神経","date":"2026-11-02","day":"月","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-11-04-p1","subject":"脳神経","date":"2026-11-04","day":"水","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-11-04-p2","subject":"脳神経","date":"2026-11-04","day":"水","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-11-04-p3","subject":"脳神経","date":"2026-11-04","day":"水","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-11-04-p4","subject":"脳神経","date":"2026-11-04","day":"水","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-11-04-p5","subject":"脳神経","date":"2026-11-04","day":"水","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-11-04-p6","subject":"脳神経","date":"2026-11-04","day":"水","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-11-04-p7","subject":"医英語","date":"2026-11-04","day":"水","period":7,"room":"4講","category":"NORMAL"},{"id":"2026-11-05-p1","subject":"精神系","date":"2026-11-05","day":"木","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-11-05-p2","subject":"精神系","date":"2026-11-05","day":"木","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-11-05-p3","subject":"精神系","date":"2026-11-05","day":"木","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-11-05-p4","subject":"脳神経","date":"2026-11-05","day":"木","period":4,"room":"CBT室","category":"PRACTICE"},{"id":"2026-11-05-p5","subject":"脳神経","date":"2026-11-05","day":"木","period":5,"room":"CBT室","category":"PRACTICE"},{"id":"2026-11-05-p6","subject":"脳神経","date":"2026-11-05","day":"木","period":6,"room":"CBT室","category":"PRACTICE"},{"id":"2026-11-06-p1","subject":"脳神経","date":"2026-11-06","day":"金","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-11-06-p2","subject":"脳神経","date":"2026-11-06","day":"金","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-11-06-p3","subject":"脳神経","date":"2026-11-06","day":"金","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-11-06-p4","subject":"医と社","date":"2026-11-06","day":"金","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-11-06-p5","subject":"医と社","date":"2026-11-06","day":"金","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-11-06-p6","subject":"医と社","date":"2026-11-06","day":"金","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-11-09-p2","subject":"精神系","date":"2026-11-09","day":"月","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-11-09-p3","subject":"精神系","date":"2026-11-09","day":"月","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-11-09-p4","subject":"脳神経","date":"2026-11-09","day":"月","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-11-09-p5","subject":"脳神経","date":"2026-11-09","day":"月","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-11-09-p6","subject":"脳神経","date":"2026-11-09","day":"月","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-11-10-p1","subject":"脳神経","date":"2026-11-10","day":"火","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-11-10-p2","subject":"脳神経","date":"2026-11-10","day":"火","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-11-10-p3","subject":"脳神経","date":"2026-11-10","day":"火","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-11-10-p4","subject":"脳神経","date":"2026-11-10","day":"火","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-11-10-p5","subject":"脳神経","date":"2026-11-10","day":"火","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-11-10-p6","subject":"脳神経","date":"2026-11-10","day":"火","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-11-11-p1","subject":"精神系","date":"2026-11-11","day":"水","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-11-11-p2","subject":"精神系","date":"2026-11-11","day":"水","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-11-11-p3","subject":"精神系","date":"2026-11-11","day":"水","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-11-11-p4","subject":"脳神経","date":"2026-11-11","day":"水","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-11-11-p5","subject":"脳神経","date":"2026-11-11","day":"水","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-11-11-p6","subject":"脳神経","date":"2026-11-11","day":"水","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-11-11-p7","subject":"医英語","date":"2026-11-11","day":"水","period":7,"room":"4講","category":"NORMAL"},{"id":"2026-11-12-p1","subject":"精神系","date":"2026-11-12","day":"木","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-11-12-p2","subject":"精神系","date":"2026-11-12","day":"木","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-11-12-p3","subject":"精神系","date":"2026-11-12","day":"木","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-11-12-p4","subject":"脳神経","date":"2026-11-12","day":"木","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-11-12-p5","subject":"脳神経","date":"2026-11-12","day":"木","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-11-12-p6","subject":"脳神経","date":"2026-11-12","day":"木","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-11-13-p1","subject":"精神系","date":"2026-11-13","day":"金","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-11-13-p2","subject":"精神系","date":"2026-11-13","day":"金","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-11-13-p3","subject":"精神系","date":"2026-11-13","day":"金","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-11-13-p4","subject":"脳神経","date":"2026-11-13","day":"金","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-11-13-p5","subject":"脳神経","date":"2026-11-13","day":"金","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-11-13-p6","subject":"脳神経","date":"2026-11-13","day":"金","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-11-16-p2","subject":"精神系","date":"2026-11-16","day":"月","period":2,"room":"4講","category":"TBL"},{"id":"2026-11-16-p3","subject":"精神系","date":"2026-11-16","day":"月","period":3,"room":"4講","category":"TBL"},{"id":"2026-11-16-p4","subject":"脳神経","date":"2026-11-16","day":"月","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-11-16-p5","subject":"脳神経","date":"2026-11-16","day":"月","period":5,"room":"4講","category":"NORMAL"},{"id":"2026-11-16-p6","subject":"脳神経","date":"2026-11-16","day":"月","period":6,"room":"4講","category":"NORMAL"},{"id":"2026-11-17-p1","subject":"脳神経","date":"2026-11-17","day":"火","period":1,"room":"4講","category":"NORMAL"},{"id":"2026-11-17-p2","subject":"脳神経","date":"2026-11-17","day":"火","period":2,"room":"4講","category":"NORMAL"},{"id":"2026-11-17-p3","subject":"脳神経","date":"2026-11-17","day":"火","period":3,"room":"4講","category":"NORMAL"},{"id":"2026-11-17-p4","subject":"脳神経","date":"2026-11-17","day":"火","period":4,"room":"4講","category":"NORMAL"},{"id":"2026-11-18-p1","subject":"脳神経","date":"2026-11-18","day":"水","period":1,"room":"4講","category":"TBL"},{"id":"2026-11-18-p2","subject":"脳神経","date":"2026-11-18","day":"水","period":2,"room":"4講","category":"TBL"},{"id":"2026-11-18-p3","subject":"脳神経","date":"2026-11-18","day":"水","period":3,"room":"4講","category":"TBL"},{"id":"2026-11-19-p4","subject":"脳神経","date":"2026-11-19","day":"木","period":4,"room":"4講","category":"EXAM"},{"id":"2026-11-19-p5","subject":"脳神経","date":"2026-11-19","day":"木","period":5,"room":"4講","category":"EXAM"},{"id":"2026-11-19-p6","subject":"脳神経","date":"2026-11-19","day":"木","period":6,"room":"4講","category":"EXAM"},{"id":"2026-11-24-p4","subject":"精神系","date":"2026-11-24","day":"火","period":4,"room":"4講","category":"EXAM"},{"id":"2026-11-24-p5","subject":"精神系","date":"2026-11-24","day":"火","period":5,"room":"4講","category":"EXAM"},{"id":"2026-11-24-p6","subject":"精神系","date":"2026-11-24","day":"火","period":6,"room":"4講","category":"EXAM"}];
+
+const STORAGE_KEY = 'shusseki-karte-attendance-v1';
+function loadAtt(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }catch(e){ return {}; } }
+function saveAtt(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(attendance)); }catch(e){} }
+let attendance = loadAtt();
+
+// ---- indices ----
+const byDatePeriod = new Map();
+const SUBJECTS = [];
+const bySubject = new Map();
+SCHEDULE.forEach(s=>{
+  const k = s.date+'|'+s.period;
+  if(!byDatePeriod.has(k)) byDatePeriod.set(k, []);
+  byDatePeriod.get(k).push(s);
+  if(!bySubject.has(s.subject)){ bySubject.set(s.subject, []); SUBJECTS.push(s.subject); }
+  bySubject.get(s.subject).push(s);
+});
+const PERIODS = [1,2,3,4,5,6,7];
+const DOWLABEL = {mon:'月',tue:'火',wed:'水',thu:'木',fri:'金'};
+const DOWKEYS = ['mon','tue','wed','thu','fri'];
+
+function pad(n){ return n<10 ? '0'+n : ''+n; }
+function iso(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function mondayOf(d){
+  const dt = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = dt.getDay();
+  const diff = dt.getDate() - day + (day===0 ? -6 : 1);
+  dt.setDate(diff);
+  return dt;
+}
+function defaultMonday(){
+  const now = new Date();
+  let base = now;
+  if(now.getDay()===0){ base = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1); }
+  return mondayOf(base);
+}
+
+let weekStart = defaultMonday();
+let activeTab = 'time';
+const openSubjects = new Set();
+const todayIso = iso(new Date());
+
+function subjectStats(subject){
+  const sessions = (bySubject.get(subject)||[]).filter(s=>s.category!=='EXAM');
+  const N = sessions.length;
+  let attended=0, absent=0;
+  sessions.forEach(s=>{
+    const st = attendance[s.id];
+    if(st==='present') attended++; else if(st==='absent') absent++;
+  });
+  const decided = attended+absent;
+  const allowedTotal = Math.floor(N/3);
+  const remaining = allowedTotal - absent;
+  const rate = decided>0 ? (attended/decided*100) : null;
+  return {N, attended, absent, decided, rate, allowedTotal, remaining, sessions};
+}
+function labelOf(s){
+  if(s.category==='EXAM') return '試験';
+  if(s.category==='TBL' || s.category==='PRACTICE') return '実習';
+  return '';
+}
+function warnLevel(remaining){
+  if(remaining<=1) return 'red';
+  if(remaining===2) return 'orange';
+  return null;
+}
+
+function cycle(id){
+  const cur = attendance[id];
+  if(!cur) attendance[id] = 'present';
+  else if(cur==='present') attendance[id] = 'absent';
+  else delete attendance[id];
+  saveAtt();
+  render();
+}
+
+function fmtMD(dateStr, day){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  return m+'/'+d+'('+day+')';
+}
+
+function renderTimetable(){
+  const wEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate()+4);
+  document.getElementById('wkLabel').innerHTML = fmtMD(iso(weekStart),'月')+' 〜 '+fmtMD(iso(wEnd),'金')+
+    '<small>タップで ー→〇→×→ー と切替</small>';
+  document.getElementById('prevWk').disabled = weekStart <= MIN_WEEK;
+  document.getElementById('nextWk').disabled = weekStart >= MAX_WEEK;
+
+  let html = '<div class="grid">';
+  html += '<div class="gcell g-corner"></div>';
+  const dayDates = [];
+  for(let i=0;i<5;i++){
+    const d = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate()+i);
+    dayDates.push(d);
+    const dIso = iso(d);
+    const isToday = dIso===todayIso;
+    html += '<div class="gcell g-daycol'+(isToday?' today':'')+'"><div class="dow">'+DOWLABEL[DOWKEYS[i]]+'</div><div class="dnum">'+(d.getMonth()+1)+'/'+d.getDate()+'</div>'+(isToday?'<div class="badge">今日</div>':'')+'</div>';
+  }
+
+  PERIODS.forEach(p=>{
+    html += '<div class="gcell g-period">'+p+'限</div>';
+    dayDates.forEach(d=>{
+      const dIso = iso(d);
+      const key = dIso+'|'+p;
+      const sessions = byDatePeriod.get(key) || [];
+      const isToday = dIso===todayIso;
+      html += '<div class="gcell g-slot'+(isToday?' today-col':'')+'">';
+      sessions.forEach(s=>{
+        const st = attendance[s.id];
+        const stats = subjectStats(s.subject);
+        const lvl = warnLevel(stats.remaining);
+        let cls = 'blk'+(s.category==='EXAM' ? ' cat-EXAM' : '');
+        if(s.category!=='EXAM'){
+          if(lvl==='orange') cls += ' warn-orange';
+          if(lvl==='red') cls += ' warn-red';
+        }
+        const markCls = st==='present' ? 'present' : st==='absent' ? 'absent' : '';
+        const markChar = st==='present' ? '〇' : st==='absent' ? '×' : '－';
+        const clickable = s.category!=='EXAM';
+        const label = labelOf(s);
+        html += '<'+(clickable?'button':'div')+' class="'+cls+'"'+(clickable?' onclick="cycle(\''+s.id+'\')"':'')+'>'
+          + '<div class="subj">'+s.subject+'</div>'
+          + '<div class="room">'+s.room+'</div>'
+          + (label ? '<div class="lbl">'+label+'</div>' : '')
+          + (clickable ? '<div class="mark '+markCls+'">'+markChar+'</div>' : '')
+          + '</'+(clickable?'button':'div')+'>';
+      });
+      html += '</div>';
+    });
+  });
+  html += '</div>';
+  document.getElementById('content').innerHTML = html;
+}
+
+function renderAttendance(){
+  let html = '<div class="sublist">';
+  SUBJECTS.forEach(subj=>{
+    const stats = subjectStats(subj);
+    const lvl = warnLevel(stats.remaining);
+    const isOpen = openSubjects.has(subj);
+    let pillHtml = '';
+    if(lvl==='red') pillHtml = '<span class="pill red">残り'+stats.remaining+'</span>';
+    else if(lvl==='orange') pillHtml = '<span class="pill orange">残り'+stats.remaining+'</span>';
+    else if(stats.decided>0) pillHtml = '<span class="pill normal">出席率'+stats.rate.toFixed(0)+'%</span>';
+
+    html += '<div class="subcard'+(isOpen?' open':'')+'">';
+    const note = subj==='医と社' ? '<span class="cnt">（9/14以降）</span>' : '';
+    html += '<button class="row" onclick="toggleSubject(\''+subj+'\')"><span class="name">'+subj+note+'<span class="cnt">全'+stats.N+'コマ</span></span><span style="display:flex;align-items:center;gap:6px;">'+pillHtml+'<span class="chev">▶</span></span></button>';
+    html += '<div class="detail">';
+    stats.sessions.slice().sort((a,b)=> a.date===b.date ? a.period-b.period : a.date<b.date?-1:1).forEach(s=>{
+      const st = attendance[s.id];
+      const markCls = st==='present' ? 'present' : st==='absent' ? 'absent' : '';
+      const markChar = st==='present' ? '〇' : st==='absent' ? '×' : '－';
+      const label = labelOf(s);
+      html += '<div class="sess"><div class="d">'+fmtMD(s.date, s.day)+'</div><div class="r"><b>'+s.period+'限</b> '+s.room+(label?' ・ '+label:'')+'</div><button class="mk '+markCls+'" onclick="cycle(\''+s.id+'\')">'+markChar+'</button></div>';
+    });
+    const rateStr = stats.decided>0 ? stats.rate.toFixed(0)+'%' : '-';
+    const rateCls = (stats.decided>0 && stats.rate<67) ? ' class="red"' : '';
+    const remCls = lvl ? ' class="'+lvl+'"' : '';
+    html += '<div class="stats">'
+      + '<div class="it">全コマ数<b>'+stats.N+'</b></div>'
+      + '<div class="it">出席数<b>'+(stats.decided>0?stats.attended:'-')+'</b></div>'
+      + '<div class="it">欠席数<b>'+(stats.decided>0?stats.absent:'-')+'</b></div>'
+      + '<div class="it">出席率<b'+rateCls+'>'+rateStr+'</b></div>'
+      + '<div class="gap"></div>'
+      + '<div class="it">残り欠席可能数<b'+remCls+'>'+stats.remaining+'</b></div>'
+      + '</div>';
+    html += '</div></div>';
+  });
+  html += '</div>';
+  document.getElementById('content').innerHTML = html;
+}
+function toggleSubject(subj){
+  if(openSubjects.has(subj)) openSubjects.delete(subj); else openSubjects.add(subj);
+  render();
+}
+
+function render(){
+  document.getElementById('weeknav').style.display = activeTab==='time' ? 'flex' : 'none';
+  document.getElementById('hdSub').textContent = activeTab==='time' ? '週間時間割' : '科目別出席状況';
+  document.getElementById('tabTime').classList.toggle('active', activeTab==='time');
+  document.getElementById('tabAtt').classList.toggle('active', activeTab==='att');
+  if(activeTab==='time') renderTimetable(); else renderAttendance();
+}
+
+const MIN_WEEK = new Date(2026,8,14);
+const MAX_WEEK = new Date(2026,10,23);
+document.getElementById('prevWk').onclick = ()=>{
+  const d = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate()-7);
+  if(d < MIN_WEEK) return;
+  weekStart = d; render();
+};
+document.getElementById('nextWk').onclick = ()=>{
+  const d = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate()+7);
+  if(d > MAX_WEEK) return;
+  weekStart = d; render();
+};
+document.getElementById('tabTime').onclick = ()=>{ activeTab='time'; render(); };
+document.getElementById('tabAtt').onclick = ()=>{ activeTab='att'; render(); };
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+
+render();
+</script>
+</body>
+</html>
