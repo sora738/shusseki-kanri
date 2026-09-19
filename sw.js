@@ -1,11 +1,11 @@
-const CACHE = 'shusseki-kanri-v2';
+const CACHE = 'shusseki-kanri-v3';
 const ASSETS = [
   './',
   './index.html',
-  './manifest.json',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/apple-touch-icon.png'
+  './manifest.json?v=2',
+  './icons/icon-192.png?v=2',
+  './icons/icon-512.png?v=2',
+  './icons/apple-touch-icon.png?v=2'
 ];
 
 self.addEventListener('install', (e) => {
