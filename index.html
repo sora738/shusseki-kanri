@@ -107,9 +107,9 @@ body{background:var(--bg);}
 .subcard{background:var(--surface);border:1px solid var(--line);border-radius:11px;overflow:hidden;}
 .subcard>.row{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border:none;background:none;font-family:inherit;text-align:left;cursor:pointer;color:var(--ink);}
 .subcard>.row:active{background:var(--surface-2);}
-.subcard .name{font-size:14.5px;font-weight:700;}
+.subcard .name{font-size:14.5px;font-weight:700;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .subcard .name .cnt{font-size:10.5px;font-weight:500;color:var(--ink-soft);margin-left:6px;}
-.pill{font-size:10.5px;font-weight:800;border-radius:20px;padding:3px 9px;white-space:nowrap;}
+.pill{font-size:9.5px;font-weight:800;border-radius:20px;padding:3px 7px;white-space:nowrap;}
 .pill.normal{background:var(--accent-soft);color:var(--accent);}
 .pill.orange{background:var(--warn-orange-bg);color:var(--warn-orange-ink);}
 .pill.red{background:var(--warn-red-bg);color:var(--warn-red-ink);}
@@ -307,14 +307,14 @@ function renderAttendance(){
     const stats = subjectStats(subj);
     const lvl = warnLevel(stats.remaining);
     const isOpen = openSubjects.has(subj);
-    let pillHtml = '';
-    if(lvl==='red') pillHtml = '<span class="pill red">残り'+stats.remaining+'</span>';
-    else if(lvl==='orange') pillHtml = '<span class="pill orange">残り'+stats.remaining+'</span>';
-    else if(stats.decided>0) pillHtml = '<span class="pill normal">出席率'+stats.rate.toFixed(0)+'%</span>';
+    const rateTxt = stats.decided>0 ? stats.rate.toFixed(0)+'%' : '-';
+    const rateCls = (stats.decided>0 && stats.rate<67) ? 'red' : 'normal';
+    const remCls = lvl==='red' ? 'red' : lvl==='orange' ? 'orange' : 'normal';
+    const pillHtml = '<span class="pill '+rateCls+'">出席率'+rateTxt+'</span><span class="pill '+remCls+'">残り'+stats.remaining+'</span>';
 
     html += '<div class="subcard'+(isOpen?' open':'')+'">';
     const note = subj==='医と社' ? '<span class="cnt">（9/14以降）</span>' : '';
-    html += '<button class="row" onclick="toggleSubject(\''+subj+'\')"><span class="name">'+subj+note+'<span class="cnt">全'+stats.N+'コマ</span></span><span style="display:flex;align-items:center;gap:6px;">'+pillHtml+'<span class="chev">▶</span></span></button>';
+    html += '<button class="row" onclick="toggleSubject(\''+subj+'\')"><span class="name">'+subj+note+'<span class="cnt">全'+stats.N+'コマ</span></span><span style="display:flex;align-items:center;gap:5px;flex:0 0 auto;">'+pillHtml+'<span class="chev">▶</span></span></button>';
     html += '<div class="detail">';
     stats.sessions.slice().sort((a,b)=> a.date===b.date ? a.period-b.period : a.date<b.date?-1:1).forEach(s=>{
       const st = attendance[s.id];
