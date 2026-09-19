@@ -324,15 +324,15 @@ function renderAttendance(){
       html += '<div class="sess"><div class="d">'+fmtMD(s.date, s.day)+'</div><div class="r"><b>'+s.period+'限</b> '+s.room+(label?' ・ '+label:'')+'</div><button class="mk '+markCls+'" onclick="cycle(\''+s.id+'\')">'+markChar+'</button></div>';
     });
     const rateStr = stats.decided>0 ? stats.rate.toFixed(0)+'%' : '-';
-    const rateCls = (stats.decided>0 && stats.rate<67) ? ' class="red"' : '';
-    const remCls = lvl ? ' class="'+lvl+'"' : '';
+    const rateAttr = (stats.decided>0 && stats.rate<67) ? ' class="red"' : '';
+    const remAttr = lvl ? ' class="'+lvl+'"' : '';
     html += '<div class="stats">'
       + '<div class="it">全コマ数<b>'+stats.N+'</b></div>'
       + '<div class="it">出席数<b>'+(stats.decided>0?stats.attended:'-')+'</b></div>'
       + '<div class="it">欠席数<b>'+(stats.decided>0?stats.absent:'-')+'</b></div>'
-      + '<div class="it">出席率<b'+rateCls+'>'+rateStr+'</b></div>'
+      + '<div class="it">出席率<b'+rateAttr+'>'+rateStr+'</b></div>'
       + '<div class="gap"></div>'
-      + '<div class="it">残り欠席可能数<b'+remCls+'>'+stats.remaining+'</b></div>'
+      + '<div class="it">残り欠席可能数<b'+remAttr+'>'+stats.remaining+'</b></div>'
       + '</div>';
     html += '</div></div>';
   });
