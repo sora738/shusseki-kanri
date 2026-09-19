@@ -94,6 +94,7 @@ body{background:var(--bg);position:fixed;inset:0;}
 .blk.cat-EXAM{background:var(--cell-exam-bg);color:var(--cell-exam-ink);cursor:default;}
 .blk.warn-orange{background:var(--warn-orange-bg)!important;color:var(--warn-orange-ink)!important;}
 .blk.warn-red{background:var(--warn-red-bg)!important;color:var(--warn-red-ink)!important;}
+.blk.unfilled{box-shadow:0 0 0 2px #E53E3E, var(--shadow);}
 .blk:active{transform:scale(.97);}
 .blk .subj{font-size:9.5px;font-weight:900;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:14px;}
 .blk .room{font-size:8px;opacity:.85;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -245,6 +246,14 @@ function warnLevel(remaining){
   if(remaining===2) return 'orange';
   return null;
 }
+function isUnfilled(s){
+  return s.category!=='EXAM' && s.date<=todayIso && !attendance[s.id];
+}
+function countUnfilledPast(){
+  let n=0;
+  SCHEDULE.forEach(s=>{ if(isUnfilled(s)) n++; });
+  return n;
+}
 
 function cycle(id){
   const cur = attendance[id];
@@ -294,6 +303,7 @@ function renderTimetable(){
         if(s.category!=='EXAM'){
           if(lvl==='orange') cls += ' warn-orange';
           if(lvl==='red') cls += ' warn-red';
+          if(isUnfilled(s)) cls += ' unfilled';
         }
         const markCls = st==='present' ? 'present' : st==='absent' ? 'absent' : '';
         const markChar = st==='present' ? '〇' : st==='absent' ? '×' : '－';
@@ -361,7 +371,9 @@ function toggleSubject(subj){
 
 function render(){
   document.getElementById('weeknav').style.display = activeTab==='time' ? 'flex' : 'none';
-  document.getElementById('hdSub').textContent = activeTab==='time' ? '週間時間割' : '科目別出席状況';
+  const subBase = activeTab==='time' ? '週間時間割' : '科目別出席状況';
+  const missing = countUnfilledPast();
+  document.getElementById('hdSub').innerHTML = subBase + (missing>0 ? ' ・ <span style="color:var(--warn-red-bg);font-weight:700;">未入力'+missing+'件</span>' : '');
   document.getElementById('tabTime').classList.toggle('active', activeTab==='time');
   document.getElementById('tabAtt').classList.toggle('active', activeTab==='att');
   document.getElementById('content').classList.toggle('scrollable', activeTab!=='time');
